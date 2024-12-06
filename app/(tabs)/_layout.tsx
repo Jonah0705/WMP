@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
 import { Pressable } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { initializeApp, getApps } from "firebase/app";
 import { firebaseConfig } from "@/fireBaseConfig"; // Correct path
 
@@ -24,13 +23,15 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
+  // Memoize screenOptions to prevent unnecessary renders and maintain consistent hooks order
+  const screenOptions = useMemo(() => ({
+    tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+    headerShown: false, // Avoid conditionally setting this with a hook
+    /* headerShown: useClientOnlyValue(false, true), */
+  }), [colorScheme]);
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: useClientOnlyValue(false, true),
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="index"
         options={{

@@ -57,9 +57,17 @@ export default function TabLayout() {
         name="two"
         options={{
           title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />
+       <Tabs.Screen
+        name="three"
+        options={{
+          title: 'Tab Three',  // You can set a custom title for this tab
+          tabBarIcon: ({ color }) => <TabBarIcon name="gears" color={color} />,  // Custom icon for third tab
+        }}
+      />
+      
     </Tabs>
   );
 }

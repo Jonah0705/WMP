@@ -5,14 +5,12 @@ import { Pressable } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { initializeApp, getApps } from "firebase/app";
-import { firebaseConfig } from "@/fireBaseConfig"; // Correct path
+import { firebaseConfig } from "@/fireBaseConfig"; 
 
-// Initialize Firebase only if it hasn't been initialized yet
 if (getApps().length === 0) {
   initializeApp(firebaseConfig);
 }
 
-// Icon component for Tab Bar
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
@@ -35,8 +33,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Map',
+          tabBarIcon: ({ color }) => <TabBarIcon name="map" color={color} />,
           headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable>
@@ -56,15 +54,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+          title: 'Locations',
+          tabBarIcon: ({ color }) => <TabBarIcon name="location-arrow" color={color} />,
         }}
       />
        <Tabs.Screen
         name="three"
         options={{
-          title: 'Tab Three',  // You can set a custom title for this tab
-          tabBarIcon: ({ color }) => <TabBarIcon name="gears" color={color} />,  // Custom icon for third tab
+          title: 'Settings',  
+          tabBarIcon: ({ color }) => <TabBarIcon name="gears" color={color} />, 
         }}
       />
       

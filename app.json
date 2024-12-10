@@ -13,6 +13,11 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "permissions": [
+      "ACCESS_FINE_LOCATION",
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_BACKGROUND_LOCATION"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -21,7 +26,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.jonah0705.WMP"
     },
     "web": {
       "bundler": "metro",
@@ -33,6 +42,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8cf3d88e-fade-47ac-bd96-554ac3a579ec"
+      }
     }
   }
 }

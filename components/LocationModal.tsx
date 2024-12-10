@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Modal, Alert, TouchableOpacity } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 type LocationModalProps = {
@@ -81,8 +81,12 @@ const LocationModal: React.FC<LocationModalProps> = ({
             />
           )}
           <View style={styles.modalButtons}>
-            <Button title="Save" onPress={handleSave} />
-            <Button title="Cancel" onPress={onCancel} />
+            <TouchableOpacity style={styles.button} onPress={handleSave}>
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={onCancel}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -113,6 +117,22 @@ const styles = StyleSheet.create({
   },
   timePickerContainer: { marginVertical: 10 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
+  button: {
+    flex: 1,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'black',
+    borderRadius: 5,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 5,
+  },
+  buttonText: {
+    color: 'black',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default LocationModal;

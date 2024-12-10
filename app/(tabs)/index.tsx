@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Alert, TextInput, Button } from 'react-native';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -14,7 +14,13 @@ import {
 import LocationList from '@/components/LocationList';
 import LocationModal from '@/components/LocationModal';
 import axios from 'axios';
-import { FlatList, Text, TouchableOpacity } from 'react-native';
+import { FlatList, Text, TouchableOpacity, Vibration } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as TaskManager from 'expo-task-manager';
+import { getAuth } from 'firebase/auth';
+
+
+const LOCATION_TASK_NAME = 'background-location-task';
 
 type LocationType = {
   id: string;
@@ -23,6 +29,7 @@ type LocationType = {
   longitude: number;
   time: string;
   distance: number;
+  address: string;
 };
 type SearchResultType = {
   place_id: string;
@@ -30,8 +37,6 @@ type SearchResultType = {
   lat: string;
   lon: string;
 };
-
-
 export default function MapSelector() {
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number;
@@ -57,6 +62,19 @@ export default function MapSelector() {
   const [searchResults, setSearchResults] = useState<SearchResultType[]>([]);
 
   const locationsCollection = collection(db, 'locations');
+
+  const mapRef = useRef<MapView>(null);
+
+const focusOnLocation = (latitude: number, longitude: number) => {
+  if (mapRef.current) {
+    mapRef.current.animateToRegion({
+      latitude,
+      longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    });
+  }
+};
 
   useEffect(() => {
     (async () => {
@@ -91,16 +109,90 @@ export default function MapSelector() {
       );
     })();
 
-    const unsubscribe = onSnapshot(locationsCollection, (snapshot) => {
-      const locations = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as LocationType[];
-      setSavedLocations(locations);
-    });
+  const user = getAuth().currentUser; 
+  if (!user) {
+    Alert.alert('Error', 'No user is logged in.');
+    return;
+  }
 
-    return () => unsubscribe();
+  const userLocationsCollection = collection(db, `locations/${user.uid}/userLocations`);
+
+  const unsubscribe = onSnapshot(userLocationsCollection, (snapshot) => {
+    const locations = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as LocationType[];
+    setSavedLocations(locations);
+  });
+
+  return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (currentLocation) {
+      savedLocations.forEach(async (location) => {
+        const distance = calculateDistance(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          location.latitude,
+          location.longitude
+        );
+  
+        const isWithinTimeRange = await checkTimeRange(location.time);
+  
+        if (distance <= location.distance && isWithinTimeRange) {
+          console.log(distance);
+          console.log(location.distance);
+          console.log(isWithinTimeRange);
+          const vibrationSetting = await AsyncStorage.getItem('vibrationSetting');
+          if (vibrationSetting === 'enabled') {
+            Vibration.vibrate([500, 500, 500]); 
+          }
+        }
+      });
+    }
+  }, [currentLocation, savedLocations, 1000]);
+  
+  async function checkTimeRange(savedTime: string): Promise<boolean> {
+    try {
+      const timeRangeString = await AsyncStorage.getItem('timeRange');
+      const timeRange = timeRangeString ? parseInt(timeRangeString, 10) : 0; 
+  
+      if (isNaN(timeRange)) return false; 
+  
+      const savedTimeDate = parseTime(savedTime);
+      const currentTime = new Date();
+  
+      const timeDiff = Math.abs(currentTime.getTime() - savedTimeDate.getTime()) / (1000 * 60);
+  
+      return timeDiff <= timeRange; 
+    } catch (error) {
+      console.error('Error checking time range:', error);
+      return false;
+    }
+  }
+  
+  function parseTime(timeString: string): Date {
+    const [hours, minutes, seconds] = timeString.split(':').map(Number);
+    const now = new Date();
+    now.setHours(hours, minutes, seconds, 0); 
+    return now;
+  }
+  
+  function calculateDistance(lat1: any, lon1: any, lat2: any, lon2: any) {
+    const R = 6371e3; 
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+    return R * c; 
+  }
 
   const openModalForNewLocation = (coordinate: { latitude: number; longitude: number }) => {
     setNewLocation(coordinate);
@@ -108,28 +200,17 @@ export default function MapSelector() {
     setEditMode(false);
     setModalVisible(true);
   };
-
-  function openModalForEditLocation(id: string, time: string, distance: number) {
-    const location = savedLocations.find((loc) => loc.id === id);
-    if (location) {
-      setEditingLocation({
-        id,
-        name: location.name,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        time,
-        distance,
-      });
-      setEditMode(true);
-      setModalVisible(true);
-    }
-  }
   
   const saveLocation = async (name: string, distance: string, time: Date) => {
     if (!newLocation) return;
   
     try {
-      // Fetch full address using reverse geocoding
+      const user = getAuth().currentUser; 
+      if (!user) {
+        Alert.alert('Error', 'No user is logged in.');
+        return;
+      }
+  
       const [address] = await Location.reverseGeocodeAsync({
         latitude: newLocation.latitude,
         longitude: newLocation.longitude,
@@ -139,46 +220,24 @@ export default function MapSelector() {
         ? `${address.name || ''}, ${address.street || ''}, ${address.city || ''}, ${address.region || ''}, ${address.country || ''}`
         : 'Address not available';
   
-      if (editMode && editingLocation) {
-        // Update existing location
-        const locationRef = doc(db, 'locations', editingLocation.id);
-        await updateDoc(locationRef, {
-          name,
-          latitude: newLocation.latitude,
-          longitude: newLocation.longitude,
-          time: time.toLocaleTimeString(),
-          distance: parseFloat(distance),
-          address: fullAddress,
-        });
-        Alert.alert('Location Updated', 'The location has been updated.');
-      } else {
-        // Add new location
-        await addDoc(locationsCollection, {
-          name,
-          latitude: newLocation.latitude,
-          longitude: newLocation.longitude,
-          time: time.toLocaleTimeString(),
-          distance: parseFloat(distance),
-          address: fullAddress,
-        });
-        Alert.alert('Location Saved', 'Your selected location has been saved.');
-      }
+      const userLocationsCollection = collection(db, `locations/${user.uid}/userLocations`);
+  
+      await addDoc(userLocationsCollection, {
+        name,
+        latitude: newLocation.latitude,
+        longitude: newLocation.longitude,
+        time: time.toLocaleTimeString(),
+        distance: parseFloat(distance),
+        address: fullAddress,
+      });
+  
+      Alert.alert('Location Saved', 'Your selected location has been saved.');
       setModalVisible(false);
     } catch (error) {
       console.error('Error saving location:', error);
     }
   };
   
-
-  const deleteLocation = async (id: string) => {
-    try {
-      const locationRef = doc(db, 'locations', id);
-      await deleteDoc(locationRef);
-      Alert.alert('Location Deleted', 'The location has been deleted.');
-    } catch (error) {
-      console.error('Error deleting location:', error);
-    }
-  };
 
   const fetchLocation = async () => {
     if (!searchQuery) return;
@@ -225,9 +284,8 @@ export default function MapSelector() {
       Alert.alert('Error', 'Invalid bounding box received from API.');
     }
 
-    // Clear the search results after selection
     setSearchResults([]);
-    setSearchQuery(''); // Optionally clear the search query
+    setSearchQuery(''); 
   };
 
   return (
@@ -258,6 +316,7 @@ export default function MapSelector() {
 
       {region && (
         <MapView
+          ref={mapRef}
           style={styles.map}
           initialRegion={region}
           region={region}
@@ -285,8 +344,7 @@ export default function MapSelector() {
       <LocationList
         currentLocation={currentLocation}
         locations={savedLocations}
-        onEdit={(id, time, distance) => openModalForEditLocation(id, time, distance)}
-        onDelete={deleteLocation}
+        onLocationPress={focusOnLocation}
       />
       
       <LocationModal

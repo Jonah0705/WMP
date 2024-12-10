@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Alert, Button, FlatList, Text } from 'react-native';
+import { StyleSheet, View, Alert, Button, FlatList, Text, TouchableOpacity } from 'react-native';
+import { getAuth } from 'firebase/auth';
 import { db } from '@/fireBaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import LocationModal from '@/components/LocationModal';
-import { getDistance } from 'geolib'; // Install with npm install geolib
+import { getDistance } from 'geolib';
 
 type LocationType = {
   id: string;
@@ -12,6 +13,7 @@ type LocationType = {
   longitude: number;
   time: string;
   distance: number;
+  address: string;
 };
 
 export default function LocationManager() {
@@ -21,10 +23,16 @@ export default function LocationManager() {
   const [editingLocation, setEditingLocation] = useState<LocationType | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  const locationsCollection = collection(db, 'locations');
-
   useEffect(() => {
-    const unsubscribe = onSnapshot(locationsCollection, (snapshot) => {
+    const user = getAuth().currentUser; 
+    if (!user) {
+      Alert.alert('Error', 'No user is logged in.');
+      return;
+    }
+
+    const userLocationsCollection = collection(db, `locations/${user.uid}/userLocations`);
+
+    const unsubscribe = onSnapshot(userLocationsCollection, (snapshot) => {
       const locations = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -45,6 +53,7 @@ export default function LocationManager() {
         longitude: location.longitude,
         time,
         distance,
+        address: location.address,
       });
       setEditMode(true);
       setModalVisible(true);
@@ -53,24 +62,35 @@ export default function LocationManager() {
 
   const saveLocation = async (name: string, distance: string, time: Date) => {
     try {
+      const user = getAuth().currentUser; 
+      if (!user) {
+        Alert.alert('Error', 'No user is logged in.');
+        return;
+      }
+
+      const userLocationsCollection = collection(db, `locations/${user.uid}/userLocations`);
+
       if (editMode && editingLocation) {
-        const locationRef = doc(db, 'locations', editingLocation.id);
+        const locationRef = doc(userLocationsCollection, editingLocation.id);
         await updateDoc(locationRef, {
           name,
           latitude: editingLocation.latitude,
           longitude: editingLocation.longitude,
           time: time.toLocaleTimeString(),
           distance: parseFloat(distance),
+          address: editingLocation.address,
         });
         Alert.alert('Location Updated', 'The location has been updated.');
-      } else {
-        await addDoc(locationsCollection, {
+      } else if (currentLocation) {
+        const newLocation = {
           name,
-          latitude: editingLocation?.latitude || 0,
-          longitude: editingLocation?.longitude || 0,
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
           time: time.toLocaleTimeString(),
           distance: parseFloat(distance),
-        });
+          address: editingLocation?.address || 'No Address Available',
+        };
+        await addDoc(userLocationsCollection, newLocation);
         Alert.alert('Location Saved', 'Your selected location has been saved.');
       }
       setModalVisible(false);
@@ -81,7 +101,14 @@ export default function LocationManager() {
 
   const deleteLocation = async (id: string) => {
     try {
-      const locationRef = doc(db, 'locations', id);
+      const user = getAuth().currentUser;
+      if (!user) {
+        Alert.alert('Error', 'No user is logged in.');
+        return;
+      }
+
+      const userLocationsCollection = collection(db, `locations/${user.uid}/userLocations`);
+      const locationRef = doc(userLocationsCollection, id);
       await deleteDoc(locationRef);
       Alert.alert('Location Deleted', 'The location has been deleted.');
     } catch (error) {
@@ -108,14 +135,21 @@ export default function LocationManager() {
 
           return (
             <View style={styles.item}>
-              <Text style={styles.text}>
-                {item.name || 'Unnamed Place'} - {updatedDistance} meters away
+              <Text style={styles.nameText}>
+                {item.name || 'Unnamed Place'}
               </Text>
-              <Text style={styles.text}>Time: {updatedTime}</Text>
-              <Text style={styles.text}>Distance: {updatedDistance} meters</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.text}>Estimate Arrival: {updatedTime}</Text>
+                <Text style={styles.text}>Ring When: {updatedDistance} meters</Text>
+              </View>
+              <Text style={styles.text}>Full Address: {item.address || 'No Address Available'}</Text>
               <View style={styles.buttonGroup}>
-                <Button title="Edit" onPress={() => openModalForEditLocation(item.id, updatedTime, updatedDistance)} />
-                <Button title="Delete" onPress={() => deleteLocation(item.id)} />
+                <TouchableOpacity style={styles.button} onPress={() => openModalForEditLocation(item.id, updatedTime, updatedDistance)}>
+                  <Text style={styles.buttonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={() => deleteLocation(item.id)}>
+                  <Text style={styles.buttonText}>Delete</Text>
+                </TouchableOpacity>
               </View>
             </View>
           );
@@ -136,9 +170,23 @@ export default function LocationManager() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, padding: 10 },
   list: { flex: 1 },
   item: { padding: 10, borderBottomWidth: 1 },
+  nameText: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   text: { marginBottom: 10 },
   buttonGroup: { flexDirection: 'row', justifyContent: 'space-between' },
+  button: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  buttonText: {
+    color: '#000',
+    fontSize: 16,
+  },
 });

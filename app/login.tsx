@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
+import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
@@ -12,12 +12,11 @@ export default function LoginScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
-  // Check if the user is already logged in when the component is mounted
   useEffect(() => {
     const unsubscribe = getAuth().onAuthStateChanged((user) => {
       if (user) {
         setIsAuthenticated(true);
-        router.push('/(tabs)'); // Navigate to tabs if user is authenticated
+        router.push('/(tabs)');
       } else {
         setIsAuthenticated(false);
       }
@@ -28,7 +27,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push('/(tabs)'); // Navigate to tabs after successful login
+      router.push('/(tabs)'); 
     } catch (err) {
       setError('Login failed. Check your email and password.');
     }
@@ -43,9 +42,9 @@ export default function LoginScreen() {
     }
   };
 
-  // Avoid rendering if authentication check is in progress
+  
   if (isAuthenticated === null) {
-    return null; // Or show a loading spinner while checking authentication state
+    return null;
   }
 
   return (
@@ -65,8 +64,14 @@ export default function LoginScreen() {
         style={styles.input}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button title="Login" onPress={handleLogin} />
-      <Button title="Sign Up" onPress={handleSignUp} />
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Login</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+          <Text style={styles.buttonText}>Sign Up</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -94,5 +99,25 @@ const styles = StyleSheet.create({
   error: {
     color: 'red',
     marginBottom: 15,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  button: {
+    flex: 1,
+    marginHorizontal: 5,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'black',
+    borderRadius: 25, 
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  buttonText: {
+    color: 'black',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
